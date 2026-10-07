@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TaskSync PWA - Control de Tareas y Hábitos Offline</title>
+    
+    <!-- PWA & Meta Tags -->
+    <meta name="description" content="Aplicación PWA inteligente para gestión de tareas y hábitos offline con notificaciones push.">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TaskSync">
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <div class="container">
+        <!-- APP HEADER NAVBAR -->
+        <header class="app-header">
+            <div class="brand">
+                <img src="icons/icon-192x192.png" alt="TaskSync Logo" class="brand-icon">
+                <div>
+                    <h1>TaskSync</h1>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">PWA Offline & Push</span>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <div id="status-pill" class="status-pill online">
+                    <span class="dot"></span>
+                    <span id="status-text">En Línea</span>
+                </div>
+
+                <button id="btn-install" class="btn-install">
+                    <i class="fa-solid fa-download"></i> Instalar App
+                </button>
+            </div>
+        </header>
+
+        <!-- DASHBOARD STATS -->
+        <section class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-icon total">
+                    <i class="fa-solid fa-list-check"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="number" id="stat-total">0</div>
+                    <div class="label">Total Tareas</div>
+                </div>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-icon pending">
+                    <i class="fa-solid fa-clock"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="number" id="stat-pending">0</div>
+                    <div class="label">Pendientes</div>
+                </div>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-icon completed">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="number" id="stat-completed">0</div>
+                    <div class="label">Completadas</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PANEL DE NOTIFICACIONES PUSH & SERVIDOR NODE -->
+        <section class="glass-card push-card">
+            <div class="push-header">
+                <div class="section-title" style="margin-bottom: 0;">
+                    <i class="fa-solid fa-bell"></i> Servidor de Notificaciones Push (Node.js)
+                </div>
+                <div class="push-status">
+                    <span>Estado Push:</span>
+                    <span id="push-status-badge" class="push-badge inactive">Verificando...</span>
+                </div>
+            </div>
+
+            <p id="push-status-text" style="font-size: 0.88rem; color: var(--text-sub); margin-bottom: 12px;">
+                Conecta tu PWA al servidor Node.js mediante VAPID Keys para recibir notificaciones push.
+            </p>
+
+            <div class="input-group">
+                <input type="text" id="input-vapid-key" class="input-field" placeholder="Clave Pública VAPID">
+                <input type="text" id="input-server-url" class="input-field" placeholder="Servidor API (ej. http://localhost:3000/api/subscribe)" value="http://localhost:3000/api/subscribe">
+            </div>
+
+            <div class="input-group" style="margin-top: 14px;">
+                <button id="btn-push-toggle" class="btn btn-primary">
+                    <i class="fa-solid fa-bell"></i> Activar Notificaciones
+                </button>
+                <button id="btn-test-push" class="btn btn-secondary">
+                    <i class="fa-solid fa-paper-plane"></i> Probar Notificación Local
+                </button>
+            </div>
+        </section>
+
+        <!-- FORMULARIO PARA AGREGAR TAREA -->
+        <section class="glass-card">
+            <div class="section-title">
+                <i class="fa-solid fa-plus-circle"></i> Agregar Nueva Tarea / Hábito
+            </div>
+
+            <form id="task-form">
+                <div class="task-form-grid">
+                    <input type="text" id="task-title" class="input-field" placeholder="¿Qué tarea o hábito deseas registrar?" required>
+                    
+                    <select id="task-category" class="input-field">
+                        <option value="trabajo">💼 Trabajo</option>
+                        <option value="estudio">📚 Estudio</option>
+                        <option value="salud">🍏 Salud</option>
+                        <option value="personal">🏠 Personal</option>
+                    </select>
+
+                    <select id="task-priority" class="input-field">
+                        <option value="high">🔴 Alta</option>
+                        <option value="medium" selected>🟠 Media</option>
+                        <option value="low">🟢 Baja</option>
+                    </select>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-plus"></i> Guardar
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- LISTA Y FILTROS DE TAREAS -->
+        <section class="glass-card">
+            <div class="filter-bar">
+                <div class="section-title" style="margin-bottom: 0;">
+                    <i class="fa-solid fa-tasks"></i> Mis Tareas
+                </div>
+
+                <div class="filter-tags">
+                    <button class="tag-btn active" data-filter="all">Todas</button>
+                    <button class="tag-btn" data-filter="trabajo">Trabajo</button>
+                    <button class="tag-btn" data-filter="estudio">Estudio</button>
+                    <button class="tag-btn" data-filter="salud">Salud</button>
+                    <button class="tag-btn" data-filter="personal">Personal</button>
+                </div>
+            </div>
+
+            <div id="task-list" class="task-list">
+                <!-- Se llena dinámicamente desde app.js -->
+            </div>
+        </section>
+
+        <footer class="footer-info">
+            <p>TaskSync Progressive Web App • Diseñada para trabajar con o sin red</p>
+            <p style="margin-top: 4px; opacity: 0.7;">Desplegable en GitHub Pages • Integrado con Servidor Node Push API</p>
+        </footer>
+    </div>
+
+    <!-- Main Client App JS -->
+    <script src="js/app.js"></script>
+</body>
+</html>
