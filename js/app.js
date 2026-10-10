@@ -1,9 +1,10 @@
 /* =========================================================
-   TaskSync PWA - Core Client Script & Push Notification Engine
+   TaskSync PWA - Core Client Script & Task Manager
    ========================================================= */
 
-// VAPID Public Key por defecto (compatible con la práctica de Twittor Node Server)
-let VAPID_PUBLIC_KEY = 'BKsTf1wxQNiM0tlZUpgzbxoPP-C3phHxs4wEKs7MgK-XJ1vp37vl3YWUNewnNjvTS7I-pHIrGUna2TVpWXmCwpM';
+// Configuración VAPID y Endpoint para comunicación en segundo plano con el Backend
+const VAPID_PUBLIC_KEY = 'BKsTf1wxQNiM0tlZUpgzbxoPP-C3phHxs4wEKs7MgK-XJ1vp37vl3YWUNewnNjvTS7I-pHIrGUna2TVpWXmCwpM';
+const BACKEND_SUBSCRIBE_URL = 'http://localhost:3000/api/subscribe';
 
 // Convertidor de Clave VAPID Base64 a Uint8Array
 function urlBase64ToUint8Array(base64String) {
@@ -32,13 +33,6 @@ const statusPill = document.getElementById('status-pill');
 const statusText = document.getElementById('status-text');
 const btnInstall = document.getElementById('btn-install');
 
-const pushStatusBadge = document.getElementById('push-status-badge');
-const pushStatusText = document.getElementById('push-status-text');
-const btnPushToggle = document.getElementById('btn-push-toggle');
-const btnTestPush = document.getElementById('btn-test-push');
-const inputVapidKey = document.getElementById('input-vapid-key');
-const inputServerUrl = document.getElementById('input-server-url');
-
 const taskForm = document.getElementById('task-form');
 const inputTaskTitle = document.getElementById('task-title');
 const selectTaskCategory = document.getElementById('task-category');
@@ -57,9 +51,11 @@ if ('serviceWorker' in navigator) {
         try {
             registroSW = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
             console.log('✅ Service Worker registrado con éxito. Scope:', registroSW.scope);
-            verificarEstadoSuscripcionPush();
+            
+            // Inicializar suscripción push en segundo plano si está permitido
+            iniciarPushEnSegundoPlano();
         } catch (err) {
-            console.error('❌ Error al registrar el Service Worker:', err);
+            console.warn('ℹ️ Registro de Service Worker:', err.message || err);
         }
     });
 }
@@ -86,135 +82,73 @@ if (btnInstall) {
 
 // Detectar cambios de Red (Online / Offline)
 function actualizarEstadoRed() {
+    if (!statusPill || !statusText) return;
     if (navigator.onLine) {
         statusPill.className = 'status-pill online';
-        statusText.textContent = 'En Línea (Conectado)';
+        statusText.textContent = 'En Línea';
     } else {
         statusPill.className = 'status-pill offline';
-        statusText.textContent = 'Sin Red (Modo Offline Active)';
+        statusText.textContent = 'Modo Offline';
     }
 }
 window.addEventListener('online', actualizarEstadoRed);
 window.addEventListener('offline', actualizarEstadoRed);
 
 // =========================================================
-// 2. GESTIÓN DE NOTIFICACIONES PUSH & SERVIDOR NODE
+// 2. SUSCRIPCIÓN PUSH SILENCIOSA EN EL BACKEND
 // =========================================================
-async function verificarEstadoSuscripcionPush() {
-    if (!('Notification' in window) || !('PushManager' in window)) {
-        pushStatusBadge.textContent = 'No soportado';
-        pushStatusBadge.className = 'push-badge inactive';
-        pushStatusText.textContent = 'Este navegador no soporta Notificaciones Push.';
-        btnPushToggle.disabled = true;
-        return;
-    }
+async function iniciarPushEnSegundoPlano() {
+    if (!('Notification' in window) || !('PushManager' in window)) return;
 
     try {
         const registro = await navigator.serviceWorker.ready;
-        const sub = await registro.pushManager.getSubscription();
+        let sub = await registro.pushManager.getSubscription();
 
+        // Si ya hay suscripción, enviarla de forma segura al backend
         if (sub) {
-            actualizarUINotificaciones(true, sub);
-        } else {
-            actualizarUINotificaciones(false);
+            enviarSuscripcionAlServidor(sub);
         }
     } catch (err) {
-        console.error('Error al verificar suscripción push:', err);
+        console.debug('Push background check:', err);
     }
 }
 
-function actualizarUINotificaciones(activa, sub = null) {
-    if (activa) {
-        pushStatusBadge.textContent = 'Activadas';
-        pushStatusBadge.className = 'push-badge active';
-        pushStatusText.textContent = 'Suscrito a notificaciones push del servidor.';
-        btnPushToggle.innerHTML = '<i class="fa-solid fa-bell-slash"></i> Desactivar Notificaciones';
-        btnPushToggle.className = 'btn btn-secondary';
-        if (sub) console.log('✅ Suscripción Activa:', JSON.stringify(sub));
-    } else {
-        pushStatusBadge.textContent = 'Inactivas';
-        pushStatusBadge.className = 'push-badge inactive';
-        pushStatusText.textContent = 'No estás suscrito a las notificaciones.';
-        btnPushToggle.innerHTML = '<i class="fa-solid fa-bell"></i> Activar Notificaciones';
-        btnPushToggle.className = 'btn btn-primary';
-    }
-}
+async function suscribirPushBackend() {
+    if (!('Notification' in window) || !('PushManager' in window)) return;
 
-// Alternar Suscripción Push
-if (btnPushToggle) {
-    btnPushToggle.addEventListener('click', async () => {
-        if (!('Notification' in window) || !('PushManager' in window)) return;
-
-        try {
-            const permiso = await Notification.requestPermission();
-            console.log('Permiso de notificación:', permiso);
-            if (permiso !== 'granted') {
-                alert('Debes permitir las notificaciones en tu navegador.');
-                return;
-            }
-
-            const registro = await navigator.serviceWorker.ready;
-            let sub = await registro.pushManager.getSubscription();
-
-            if (sub) {
-                // Cancelar suscripción
-                await sub.unsubscribe();
-                console.log('Suscripción eliminada');
-                actualizarUINotificaciones(false);
-            } else {
-                // Crear nueva suscripción VAPID
-                const claveVapid = inputVapidKey.value.trim() || VAPID_PUBLIC_KEY;
-                sub = await registro.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array(claveVapid)
-                });
-                console.log('✅ Nueva suscripción Push creada:', sub);
-
-                // Enviar suscripción al servidor Node API
-                await enviarSuscripcionAlServidor(sub);
-                actualizarUINotificaciones(true, sub);
-            }
-        } catch (err) {
-            console.error('Error al alternar notificaciones push:', err);
-            alert('Error al gestionar las notificaciones: ' + err.message);
-        }
-    });
-}
-
-// Enviar Endpoint / Keys al Servidor Backend Node
-async function enviarSuscripcionAlServidor(sub) {
-    const serverUrl = inputServerUrl.value.trim() || 'http://localhost:3000/api/subscribe';
     try {
-        const resp = await fetch(serverUrl, {
+        const permiso = await Notification.requestPermission();
+        if (permiso !== 'granted') return;
+
+        const registro = await navigator.serviceWorker.ready;
+        let sub = await registro.pushManager.getSubscription();
+
+        if (!sub) {
+            sub = await registro.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+            });
+        }
+
+        if (sub) {
+            await enviarSuscripcionAlServidor(sub);
+        }
+    } catch (err) {
+        console.debug('Push subscription:', err.message);
+    }
+}
+
+async function enviarSuscripcionAlServidor(sub) {
+    try {
+        await fetch(BACKEND_SUBSCRIBE_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(sub)
         });
-        if (resp.ok) {
-            console.log('✅ Suscripción enviada exitosamente al servidor Node:', serverUrl);
-        } else {
-            console.warn('⚠️ El servidor respondió con estado:', resp.status);
-        }
     } catch (err) {
-        console.warn('⚠️ No se pudo conectar al servidor Node (Asegúrate de ejecutar npm start en el servidor):', err.message);
+        // En frontend no interrumpimos al usuario si el servidor backend local está apagado
+        console.debug('Servidor Node backend no disponible en este momento:', err.message);
     }
-}
-
-// Probar Notificación Local
-if (btnTestPush) {
-    btnTestPush.addEventListener('click', async () => {
-        if (Notification.permission === 'granted') {
-            const registro = await navigator.serviceWorker.ready;
-            registro.showNotification('🎉 ¡Prueba de Notificación TaskSync!', {
-                body: 'Esta es una notificación de prueba funcionando desde la PWA.',
-                icon: 'icons/icon-192x192.png',
-                badge: 'icons/icon-192x192.png',
-                vibrate: [100, 50, 100]
-            });
-        } else {
-            alert('Primero activa las notificaciones usando el botón "Activar Notificaciones".');
-        }
-    });
 }
 
 // =========================================================
@@ -223,13 +157,17 @@ if (btnTestPush) {
 function cargarTareas() {
     const guardadas = localStorage.getItem('tasksync_tasks');
     if (guardadas) {
-        tasks = JSON.parse(guardadas);
+        try {
+            tasks = JSON.parse(guardadas);
+        } catch (e) {
+            tasks = [];
+        }
     } else {
-        // Tareas demo iniciales
+        // Tareas iniciales de bienvenida
         tasks = [
             { id: 1, title: 'Instalar PWA en el celular o navegador', category: 'estudio', priority: 'high', completed: false, date: new Date().toLocaleDateString() },
-            { id: 2, title: 'Revisar notificaciones push y Service Worker', category: 'trabajo', priority: 'high', completed: true, date: new Date().toLocaleDateString() },
-            { id: 3, title: 'Beber 2 litros de agua (Hábito diario)', category: 'salud', priority: 'medium', completed: false, date: new Date().toLocaleDateString() }
+            { id: 2, title: 'Revisar pendientes del día', category: 'trabajo', priority: 'medium', completed: true, date: new Date().toLocaleDateString() },
+            { id: 3, title: 'Tomar 2 litros de agua (Hábito saludable)', category: 'salud', priority: 'low', completed: false, date: new Date().toLocaleDateString() }
         ];
         guardarTareas();
     }
@@ -271,12 +209,15 @@ function agregarTarea(e) {
 
     inputTaskTitle.value = '';
 
-    // Si las notificaciones están permitidas, enviar recordatorio local
-    if (Notification.permission === 'granted' && registroSW) {
-        registroSW.showNotification('📝 Nueva Tarea Registrada', {
-            body: `Se agregó: "${titulo}" (${selectTaskCategory.value.toUpperCase()})`,
-            icon: 'icons/icon-192x192.png'
+    // Notificación en el dispositivo si están habilitadas
+    if ('Notification' in window && Notification.permission === 'granted' && registroSW) {
+        registroSW.showNotification('📝 Tarea guardada', {
+            body: `"${titulo}" agregada a ${selectTaskCategory.value.toUpperCase()}`,
+            icon: './icons/icon-192x192.png'
         });
+    } else if ('Notification' in window && Notification.permission === 'default') {
+        // Solicitar permisos amigablemente en background
+        suscribirPushBackend();
     }
 }
 
@@ -374,6 +315,4 @@ document.addEventListener('DOMContentLoaded', () => {
     actualizarEstadoRed();
     cargarTareas();
     if (taskForm) taskForm.addEventListener('submit', agregarTarea);
-
-    if (inputVapidKey) inputVapidKey.value = VAPID_PUBLIC_KEY;
 });
