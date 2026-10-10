@@ -328,7 +328,7 @@ function renderizarTareas() {
                 <div class="task-details">
                     <span class="task-text">${escaparHTML(tarea.title)}</span>
                     <div class="task-meta">
-                        <span class="category-chip">${tarea.category}</span>
+                        <span class="category-chip category-${tarea.category}">${tarea.category}</span>
                         <span class="priority-${tarea.priority}">
                             <i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i> Prioridad ${tarea.priority.toUpperCase()}
                         </span>

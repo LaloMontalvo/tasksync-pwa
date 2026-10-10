@@ -1,6 +1,6 @@
-const STATIC_CACHE = 'tasksync-static-v1';
-const DYNAMIC_CACHE = 'tasksync-dynamic-v1';
-const INMUTABLE_CACHE = 'tasksync-inmutable-v1';
+const STATIC_CACHE = 'tasksync-static-v2';
+const DYNAMIC_CACHE = 'tasksync-dynamic-v2';
+const INMUTABLE_CACHE = 'tasksync-inmutable-v2';
 
 const APP_SHELL = [
     './',

@@ -7,9 +7,9 @@
     
     <!-- PWA & Meta Tags -->
     <meta name="description" content="Aplicación PWA inteligente para gestión de tareas y hábitos offline con notificaciones push.">
-    <meta name="theme-color" content="#0f172a">
+    <meta name="theme-color" content="#ffffff">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="TaskSync">
     
     <link rel="manifest" href="manifest.json">
@@ -34,7 +34,7 @@
                 <img src="icons/icon-192x192.png" alt="TaskSync Logo" class="brand-icon">
                 <div>
                     <h1>TaskSync</h1>
-                    <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">PWA Offline & Push</span>
+                    <span class="brand-subtitle">PWA Offline & Push</span>
                 </div>
             </div>
             
@@ -95,8 +95,8 @@
                 </div>
             </div>
 
-            <p id="push-status-text" style="font-size: 0.88rem; color: var(--text-sub); margin-bottom: 12px;">
-                Conecta tu PWA al servidor Node.js mediante VAPID Keys para recibir notificaciones push.
+            <p id="push-status-text" class="push-desc">
+                Conecta tu PWA al servidor Node.js mediante VAPID Keys para recibir notificaciones push en tiempo real.
             </p>
 
             <div class="input-group">
@@ -167,7 +167,7 @@
 
         <footer class="footer-info">
             <p>TaskSync Progressive Web App • Diseñada para trabajar con o sin red</p>
-            <p style="margin-top: 4px; opacity: 0.7;">Desplegable en GitHub Pages • Integrado con Servidor Node Push API</p>
+            <p style="opacity: 0.7;">Desplegable en GitHub Pages • Integrado con Servidor Node Push API</p>
         </footer>
     </div>
 
